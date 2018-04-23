@@ -14,6 +14,7 @@ function getDefaults() {
     idProperty: '_id',
     findOneAndUpdate: true,
     findOneAndRemove: true,
+    autoGenerateUrlPrefixes: true,
     lean: true,
     restify: false,
     runValidators: false,
@@ -23,8 +24,8 @@ function getDefaults() {
   })
 }
 
-const restify = function(app, model, opts) {
-  const options = Object.assign({}, getDefaults(), opts || {})
+const restify = function (app, model) {
+  const options = Object.assign({}, getDefaults(), model.restifyOptions || {})
 
   const access = require('./middleware/access')
   const ensureContentType = require('./middleware/ensureContentType')(options)
@@ -93,12 +94,8 @@ const restify = function(app, model, opts) {
 
   const ops = require('./operations')(model, options, excludedMap)
 
-  let uriItem = `${options.prefix}${options.version}/${options.name}`
-  if (uriItem.indexOf('/:id') === -1) {
-    uriItem += '/:id'
-  }
-
-  const uriItems = uriItem.replace('/:id', '')
+  const uriItems = options.autoGenerateUrlPrefixes ? `${options.prefix}${options.version}/${options.name}` : '/'
+  const uriItem = uriItems + '/:id'
   const uriCount = uriItems + '/count'
   const uriShallow = uriItem + '/shallow'
 
@@ -124,9 +121,7 @@ const restify = function(app, model, opts) {
   app.get(uriShallow, prepareQuery, options.preMiddleware, options.preRead, accessMiddleware, ops.getShallow, prepareOutput)
 
   app.post(uriItems, prepareQuery, ensureContentType, options.preMiddleware, options.preCreate, accessMiddleware, ops.createObject, prepareOutput)
-  app.post(uriItem, util.deprecate(prepareQuery, 'express-restify-mongoose: in a future major version, the POST method to update resources will be removed. Use PATCH instead.'), ensureContentType, options.preMiddleware, options.findOneAndUpdate ? [] : filterAndFindById, options.preUpdate, accessMiddleware, ops.modifyObject, prepareOutput)
 
-  app.put(uriItem, util.deprecate(prepareQuery, 'express-restify-mongoose: in a future major version, the PUT method will replace rather than update a resource. Use PATCH instead.'), ensureContentType, options.preMiddleware, options.findOneAndUpdate ? [] : filterAndFindById, options.preUpdate, accessMiddleware, ops.modifyObject, prepareOutput)
   app.patch(uriItem, prepareQuery, ensureContentType, options.preMiddleware, options.findOneAndUpdate ? [] : filterAndFindById, options.preUpdate, accessMiddleware, ops.modifyObject, prepareOutput)
 
   app.delete(uriItems, prepareQuery, options.preMiddleware, options.preDelete, ops.deleteItems, prepareOutput)
